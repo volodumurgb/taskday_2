@@ -1,4 +1,7 @@
-from sqlalchemy import String
+from decimal import Decimal
+
+from sqlalchemy import ForeignKey, Numeric, String
+
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -13,3 +16,17 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(254), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), server_default="user")
+
+class Wallet(Base):
+    """Store the balance of a user's wallet."""
+
+    __tablename__ = "wallets"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        primary_key=True,
+    )
+    balance: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        server_default="0.00",
+    )
