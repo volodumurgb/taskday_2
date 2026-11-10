@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, text
 
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -64,6 +64,11 @@ class Booking(Base):
     __table_args__ = (
         CheckConstraint("ends_at > starts_at", name="ck_bookings_time_order"),
         Index("ix_bookings_desk_start", "desk_id", "starts_at"),
+        Index(
+            "ix_bookings_pending_reminders",
+            "starts_at",
+            postgresql_where=text("cancelled_at IS NULL AND reminded_at IS NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -73,3 +78,4 @@ class Booking(Base):
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
