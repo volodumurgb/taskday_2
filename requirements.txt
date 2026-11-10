@@ -1,7 +1,9 @@
 ﻿agent-detector==2.0.0
+alembic==1.20.1
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.16.0
+asyncpg==0.32.0
 certifi==2026.10.23
 charset-normalizer==3.5.2
 click==8.5.1
@@ -14,6 +16,7 @@ fastapi-cli==0.0.32
 fastapi-cloud-cli==0.27.1
 fastar==0.12.0
 googleapis-common-protos==1.76.0
+greenlet==3.5.6
 h11==0.16.0
 httpcore==1.0.9
 httpcore2==2.16.0
@@ -22,6 +25,7 @@ httpx==0.28.1
 httpx2==2.16.0
 idna==3.20
 Jinja2==3.1.6
+Mako==1.4.3
 markdown-it-py==4.2.0
 MarkupSafe==3.0.4
 mdurl==0.1.2
@@ -48,6 +52,7 @@ rich-toolkit==0.20.6
 rignore==0.8.1
 sentry-sdk==2.74.0
 shellingham==1.5.4
+SQLAlchemy==2.1.8
 starlette==1.10.0
 truststore==0.10.5
 typer==0.29.0
