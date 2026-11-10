@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
@@ -28,6 +28,7 @@ class BookingResponse(BaseModel):
     starts_at: datetime
     ends_at: datetime
     total_cost: Decimal
+    cancelled_at: datetime | None
 
 
 def calculate_cost(
@@ -99,5 +100,42 @@ async def create_booking(
         if getattr(exc.orig, "sqlstate", None) != "23P01":
             raise
         raise HTTPException(status_code=409, detail="Desk is already booked") from exc
+
+    return result
+
+
+@router.post("/{booking_id}/cancel")
+async def cancel_booking(
+    booking_id: Annotated[int, Path(gt=0, le=2_147_483_647)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> BookingResponse:
+    """Cancel the owner's upcoming booking and refund the original charge."""
+    async with Session.begin() as session:
+        statement = (
+            select(Booking)
+            .where(Booking.id == booking_id, Booking.user_id == user.id)
+            .with_for_update()
+        )
+        booking = await session.scalar(statement)
+        if booking is None:
+            raise HTTPException(status_code=404, detail="Booking not found")
+        if booking.cancelled_at is not None:
+            raise HTTPException(status_code=409, detail="Booking is already cancelled")
+
+        now = datetime.now(timezone.utc)
+        if booking.starts_at <= now:
+            raise HTTPException(status_code=409, detail="Booking has already started")
+
+        refund = (
+            update(Wallet)
+            .where(Wallet.user_id == user.id)
+            .values(balance=Wallet.balance + booking.total_cost)
+            .returning(Wallet.user_id)
+        )
+        if await session.scalar(refund) is None:
+            raise HTTPException(status_code=409, detail="Wallet not found")
+
+        booking.cancelled_at = now
+        result = BookingResponse.model_validate(booking)
 
     return result

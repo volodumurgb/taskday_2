@@ -11,9 +11,6 @@ from app.models import User, Wallet
 
 router = APIRouter(prefix="/wallet", tags=["wallet"])
 
-MAX_BALANCE = Decimal("9999999999.99")
-
-
 class TopUpRequest(BaseModel):
     amount: Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=2)]
 
@@ -32,7 +29,6 @@ async def top_up(
         statement = (
             update(Wallet)
             .where(Wallet.user_id == user.id)
-            .where(Wallet.balance <= MAX_BALANCE - payload.amount)
             .values(balance=Wallet.balance + payload.amount)
             .returning(Wallet.balance)
         )
@@ -41,7 +37,7 @@ async def top_up(
         if balance is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Wallet is missing or the balance limit would be exceeded",
+                detail="Wallet not found",
             )
 
     return BalanceResponse(balance=balance)
