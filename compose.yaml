@@ -6,6 +6,7 @@ services:
     environment:
       JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env}"
       DATABASE_URL: "postgresql+asyncpg://coworking:local_dev_password@db:5432/coworking"
+      REDIS_URL: "redis://redis:6379/0"
 
   db:
     image: postgres:17
