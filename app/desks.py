@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import require_admin
@@ -102,8 +103,13 @@ async def update_desk(
 
 @router.delete("/{desk_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_desk(location_id: int, desk_id: int) -> Response:
-    async with Session.begin() as session:
-        desk = await get_desk_or_404(session, location_id, desk_id)
-        await session.delete(desk)
+    try:
+        async with Session.begin() as session:
+            desk = await get_desk_or_404(session, location_id, desk_id)
+            await session.delete(desk)
+    except IntegrityError as exc:
+        if getattr(exc.orig, "sqlstate", None) != "23503":
+            raise
+        raise HTTPException(status_code=409, detail="Desk has booking history") from exc
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

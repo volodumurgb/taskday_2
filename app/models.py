@@ -1,6 +1,7 @@
+from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String
 
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -54,3 +55,21 @@ class Desk(Base):
     name: Mapped[str] = mapped_column(String(100))
     kind: Mapped[str] = mapped_column(String(30))
     hourly_rate: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+
+
+class Booking(Base):
+    """Store a reservation and the original amount charged."""
+
+    __tablename__ = "bookings"
+    __table_args__ = (
+        CheckConstraint("ends_at > starts_at", name="ck_bookings_time_order"),
+        Index("ix_bookings_desk_start", "desk_id", "starts_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    desk_id: Mapped[int] = mapped_column(ForeignKey("desks.id"))
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
