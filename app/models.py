@@ -40,3 +40,17 @@ class Location(Base):
     name: Mapped[str] = mapped_column(String(120))
     address: Mapped[str] = mapped_column(String(250))
     city: Mapped[str] = mapped_column(String(100))
+
+class Desk(Base):
+    """Store a bookable workspace and its hourly rate."""
+
+    __tablename__ = "desks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    location_id: Mapped[int] = mapped_column(
+        ForeignKey("locations.id"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(100))
+    kind: Mapped[str] = mapped_column(String(30))
+    hourly_rate: Mapped[Decimal] = mapped_column(Numeric(12, 2))

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, StringConstraints
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.auth import require_admin
 from app.db import Session
@@ -85,8 +86,18 @@ async def update_location(
 
 @router.delete("/{location_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_location(location_id: int) -> Response:
-    async with Session.begin() as session:
-        location = await get_location_or_404(session, location_id)
-        await session.delete(location)
+    """Delete a location only when it has no workspaces."""
+    try:
+        async with Session.begin() as session:
+            location = await get_location_or_404(session, location_id)
+            await session.delete(location)
+    except IntegrityError as exc:
+        if getattr(exc.orig, "sqlstate", None) != "23503":
+            raise
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Remove the location's desks before deleting it",
+        ) from exc
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
