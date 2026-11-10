@@ -30,3 +30,13 @@ class Wallet(Base):
         Numeric(12, 2),
         server_default="0.00",
     )
+
+class Location(Base):
+    """Represent a coworking site with a name, address, and city."""
+
+    __tablename__ = "locations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    address: Mapped[str] = mapped_column(String(250))
+    city: Mapped[str] = mapped_column(String(100))

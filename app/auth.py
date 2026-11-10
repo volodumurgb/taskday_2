@@ -122,6 +122,16 @@ async def get_current_user(
 
     return user
 
+async def require_admin(
+    user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    """Allow the request only if the authenticated user is an admin."""
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator access required",
+        )
+
 
 class CurrentUserResponse(BaseModel):
     id: int
@@ -135,3 +145,13 @@ async def read_me(
 ) -> CurrentUserResponse:
     """Return the profile of the authenticated user."""
     return CurrentUserResponse(id=user.id, email=user.email, role=user.role)
+
+async def require_admin(
+    user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    """Reject requests from authenticated users who are not administrators."""
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator access required",
+        )
