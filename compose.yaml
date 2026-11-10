@@ -1,12 +1,26 @@
 services:
   api:
     build: .
+    command:
+      - /bin/sh
+      - -c
+      - python -m alembic upgrade head && exec python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env}"
+      JWT_SECRET: "${JWT_SECRET:-}"
       DATABASE_URL: "postgresql+asyncpg://coworking:local_dev_password@db:5432/coworking"
       REDIS_URL: "redis://redis:6379/0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   db:
     image: postgres:17
@@ -16,6 +30,11 @@ services:
       POSTGRES_PASSWORD: local_dev_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "coworking", "-d", "coworking"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7-alpine

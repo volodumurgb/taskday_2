@@ -1,4 +1,5 @@
 import os
+from secrets import token_hex
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -16,7 +17,7 @@ from app.models import User, Wallet
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 password_hasher = PasswordHash.recommended()
-JWT_SECRET = os.environ["JWT_SECRET"]
+JWT_SECRET = os.getenv("JWT_SECRET") or token_hex(32)
 JWT_ALGORITHM = "HS256"
 TOKEN_LIFETIME = timedelta(minutes=30)
 
