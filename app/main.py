@@ -2,14 +2,17 @@ import asyncio
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
+
 from app.auth import router as auth_router
-from app.availability import create_cache, router as availability_router
+from app.availability import create_cache
+from app.availability import router as availability_router
 from app.bookings import router as bookings_router
 from app.db import engine
-from app.wallet import router as wallet_router
+from app.desks import router as desks_router
 from app.locations import router as locations_router
 from app.reminders import run_reminders
-from app.desks import router as desks_router
+from app.wallet import router as wallet_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
-from sqlalchemy import select, update
+from sqlalchemy import DateTime, func, literal_column, select, type_coerce, update
+from sqlalchemy.dialects.postgresql import TSTZRANGE
 from sqlalchemy.exc import IntegrityError
 
 from app.auth import get_current_user
@@ -45,11 +46,19 @@ def calculate_cost(
 
 def overlapping_bookings(desk_id, starts_at: datetime, ends_at: datetime):
     """Select active bookings intersecting the half-open time window."""
+    bounds = literal_column("'[)'")
+    booked_window = func.tstzrange(
+        Booking.starts_at, Booking.ends_at, bounds, type_=TSTZRANGE
+    )
+    requested_window = func.tstzrange(
+        type_coerce(starts_at, DateTime(timezone=True)),
+        type_coerce(ends_at, DateTime(timezone=True)),
+        bounds,
+    )
     return select(Booking.id).where(
         Booking.desk_id == desk_id,
         Booking.cancelled_at.is_(None),
-        Booking.starts_at < ends_at,
-        Booking.ends_at > starts_at,
+        booked_window.overlaps(requested_window),
     )
 
 

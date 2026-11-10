@@ -1,13 +1,21 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, text
-
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    func,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    """Collect the table definitions used by the application."""
+    pass
 
 
 class User(Base):
@@ -18,9 +26,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), server_default="user")
 
-class Wallet(Base):
-    """Store the balance of a user's wallet."""
 
+class Wallet(Base):
     __tablename__ = "wallets"
 
     user_id: Mapped[int] = mapped_column(
@@ -32,9 +39,8 @@ class Wallet(Base):
         server_default="0.00",
     )
 
-class Location(Base):
-    """Represent a coworking site with a name, address, and city."""
 
+class Location(Base):
     __tablename__ = "locations"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -42,9 +48,10 @@ class Location(Base):
     address: Mapped[str] = mapped_column(String(250))
     city: Mapped[str] = mapped_column(String(100))
 
-class Desk(Base):
-    """Store a bookable workspace and its hourly rate."""
+    __table_args__ = (Index("ix_locations_lower_city", func.lower(city)),)
 
+
+class Desk(Base):
     __tablename__ = "desks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -58,8 +65,6 @@ class Desk(Base):
 
 
 class Booking(Base):
-    """Store a reservation and the original amount charged."""
-
     __tablename__ = "bookings"
     __table_args__ = (
         CheckConstraint("ends_at > starts_at", name="ck_bookings_time_order"),
@@ -76,6 +81,6 @@ class Booking(Base):
     desk_id: Mapped[int] = mapped_column(ForeignKey("desks.id"))
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    total_cost: Mapped[Decimal] = mapped_column(Numeric(20, 2))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

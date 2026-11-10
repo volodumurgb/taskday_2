@@ -1,16 +1,16 @@
+import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-import json
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.db import Session
 from app.main import app
-from app.models import Booking, Desk, Location, Wallet
+from app.models import Booking, Desk, Location, User, Wallet
 from app.reminders import claim_due_reminders
 
 
@@ -119,6 +119,76 @@ def test_concurrent_requests_charge_only_one_booking(client, workspace):
 
     assert statuses == [201, 409]
     assert client.portal.call(booking_state, desk_id, user_id) == (Decimal("180.00"), 1)
+
+
+def test_large_booking_charge_and_refund(client, workspace):
+    desk_id, _ = workspace
+    user_id, headers = register(client, funds="9000000000.00")
+    assert client.post(
+        "/wallet/top-up", headers=headers, json={"amount": "9000000000.00"}
+    ).status_code == 200
+
+    async def set_rate():
+        async with Session.begin() as session:
+            await session.execute(
+                update(Desk).where(Desk.id == desk_id).values(hourly_rate=Decimal("9000000000.00"))
+            )
+
+    client.portal.call(set_rate)
+    start = datetime.now(timezone.utc) + timedelta(days=2)
+    payload = booking_payload(desk_id, start)
+    payload["ends_at"] = (start + timedelta(hours=1, minutes=30)).isoformat()
+    booking = client.post("/bookings", headers=headers, json=payload)
+
+    assert booking.status_code == 201, booking.text
+    assert Decimal(booking.json()["total_cost"]) == Decimal("13500000000.00")
+    assert client.portal.call(booking_state, desk_id, user_id) == (Decimal("4500000000.00"), 1)
+
+    response = client.post(f"/bookings/{booking.json()['id']}/cancel", headers=headers)
+    assert response.status_code == 200, response.text
+    assert client.portal.call(booking_state, desk_id, user_id) == (Decimal("18000000000.00"), 1)
+
+
+def test_admin_can_manage_locations_and_desks(client):
+    user_id, headers = register(client)
+    location = {"name": "Hub", "address": "Main street", "city": "Kyiv"}
+
+    assert client.get("/locations").status_code == 401
+    assert client.post("/locations", headers=headers, json=location).status_code == 403
+
+    async def grant_admin():
+        async with Session.begin() as session:
+            await session.execute(update(User).where(User.id == user_id).values(role="admin"))
+
+    client.portal.call(grant_admin)
+    response = client.post("/locations", headers=headers, json=location)
+    assert response.status_code == 201, response.text
+    location_id = response.json()["id"]
+    location_url = f"/locations/{location_id}"
+    desks_url = f"{location_url}/desks"
+    assert response.json() in client.get("/locations", headers=headers).json()
+    assert client.get(location_url, headers=headers).json() == {"id": location_id, **location}
+    location["city"] = "Lviv"
+    response = client.put(location_url, headers=headers, json=location)
+    assert response.status_code == 200, response.text
+    assert response.json() == {"id": location_id, **location}
+
+    desk = {"name": "Desk 1", "kind": "open_space", "hourly_rate": "120.00"}
+    response = client.post(desks_url, headers=headers, json=desk)
+    assert response.status_code == 201, response.text
+    desk_url = f"{desks_url}/{response.json()['id']}"
+    assert client.get(desks_url, headers=headers).json() == [response.json()]
+    assert client.get(desk_url, headers=headers).json() == response.json()
+    desk["kind"] = "private_office"
+    response = client.put(desk_url, headers=headers, json=desk)
+    assert response.status_code == 200, response.text
+    assert response.json()["kind"] == "private_office"
+
+    assert client.delete(location_url, headers=headers).status_code == 409
+    assert client.delete(desk_url, headers=headers).status_code == 204
+    assert client.get(desk_url, headers=headers).status_code == 404
+    assert client.delete(location_url, headers=headers).status_code == 204
+    assert client.get(location_url, headers=headers).status_code == 404
 
 
 def test_only_owner_can_cancel_and_refund_is_applied_once(client, workspace):
